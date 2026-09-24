@@ -1,17 +1,19 @@
+# Base image for Firefox application container
 FROM jlesage/firefox:latest
 
-# Use the exact variable names required by the jlesage base image
-ENV WEB_LISTENING_PORT=10000
-ENV VNC_LISTENING_PORT=5900
-
-# Apply the TigerVNC anti-blacklisting configuration
+# 1. Disable TigerVNC Blacklisting completely to prevent readiness probes from locking out localhost
 RUN mkdir -p /etc/tigervnc && \
     echo "BlacklistThreshold=0" >> /etc/tigervnc/vncserver-config-defaults && \
-    echo "BlacklistTimeout=0" >> /etc/tigervnc/vncserver-config-defaults && \
-    find /etc/services.d -type f -name "run" -exec sed -i 's/Xvnc/Xvnc -BlacklistThreshold 0 -BlacklistTimeout 0/g' {} + || true
+    echo "BlacklistTimeout=0" >> /etc/tigervnc/vncserver-config-defaults
 
-# Expose the web port for Render's routing
-EXPOSE 10000
+# 2. Add custom Xvnc extra parameters to enforce no blacklisting via command flags
+ENV VNC_EXTRA_OPTS="-BlacklistThreshold 0 -BlacklistTimeout 0"
 
-# Start the built-in init system
-ENTRYPOINT ["/init"]
+# 3. Expose standard container ports
+# 5800: Web GUI (HTTP/noVNC) - TARGET FOR HEALTH CHECKS
+# 5900: Raw VNC Port (RFB Protocol)
+EXPOSE 5800 5900
+
+# 4. Optional: Configure container healthcheck to target the HTTP web interface instead of raw VNC
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:5800/ || exit 1
