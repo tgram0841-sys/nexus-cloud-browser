@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  firefox:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: firefox_app
+    ports:
+      - "5800:5800" # Web UI Access (HTTP)
+      - "5900:5900" # VNC Server Access (RFB)
+    environment:
+      - DISPLAY_WIDTH=1920
+      - DISPLAY_HEIGHT=1080
+      - VNC_PASSWORD=your_secure_password
+      - ENABLE_VNC_SSL=0
+    # Fixes GPU hardware acceleration warning by passing host DRI devices
+    devices:
+      - /dev/dri:/dev/dri
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:5800/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
