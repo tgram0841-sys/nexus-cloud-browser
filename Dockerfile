@@ -1,19 +1,25 @@
-# Use a highly optimized, lightweight Firefox container
 FROM jlesage/firefox:latest
 
-# Render routes traffic to a specific port. We set the web UI to port 10000.
+# Set the Web UI port to match the environment's expected port (from your logs: 10000)
+# This prevents the cloud provider from scanning/hitting the raw VNC port by mistake.
 ENV WEB_PORT=10000
+ENV VNC_PORT=5900
+
+# Fix the Xvnc "127.0.0.1 Blacklisted" issue.
+# This forces the VNC server to never blacklist IPs, even if health checkers ping it with HTTP traffic.
+USER root
+RUN mkdir -p /etc/tigervnc && \
+    echo "BlacklistThreshold=0" >> /etc/tigervnc/vncserver-config-defaults && \
+    echo "BlacklistTimeout=0" >> /etc/tigervnc/vncserver-config-defaults && \
+    # Patch the s6-overlay startup scripts used by jlesage images to include the flags directly
+    find /etc/services.d -type f -name "run" -exec sed -i 's/Xvnc/Xvnc -BlacklistThreshold 0 -BlacklistTimeout 0/g' {} + || true
+
+# (Optional) If you have a custom startup script (e.g., start.sh), copy it here.
+# COPY start.sh /start.sh
+# RUN chmod +x /start.sh
+
+# Expose the web port so the cloud platform routes HTTP traffic correctly
 EXPOSE 10000
 
-# Remove VNC password for instant access (You can set a password here later for security)
-ENV VNC_PASSWORD=""
-
-# Keep the browser open in the background even if you close all tabs
-ENV KEEP_APP_RUNNING=1
-
-# Optimize resolution for cloud streaming
-ENV DISPLAY_WIDTH=1280
-ENV DISPLAY_HEIGHT=720
-
-# Enable Dark Mode UI for the container environment
-ENV DARK_MODE=1
+# Start the default jlesage init system
+ENTRYPOINT ["/init"]
